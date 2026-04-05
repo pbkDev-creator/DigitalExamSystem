@@ -3,13 +3,20 @@ const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const axios = require('axios'); // Added for image-to-base64 conversion
+const axios = require('axios'); 
 require('dotenv').config();
 
 const app = express();
-app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
+
+// --- 1. DYNAMIC CORS FOR DEPLOYMENT ---
+// This allows your local testing AND your future public URL to talk to this server
+app.use(cors({
+  origin: '*', 
+  methods: ['GET', 'POST']
+}));
 app.use(express.json());
 
+// --- 2. CLOUDINARY CONFIG ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
   api_key: process.env.CLOUDINARY_KEY,
@@ -17,28 +24,34 @@ cloudinary.config({
   secure: true
 });
 
+// --- 3. CLOUDINARY STORAGE SETUP ---
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: { folder: 'exam_submissions', resource_type: 'auto' },
+  params: { 
+    folder: 'SECURE_EXAM_UPLOADS', 
+    resource_type: 'auto',
+    transformation: [{ width: 1200, crop: "limit" }] // Optimization for AI reading
+  },
 });
 const upload = multer({ storage: storage });
 
+// In-memory storage (Note: This resets if the server restarts on Render)
 let submissions = [];
 
-// --- 2026 AI VISION EVALUATOR ---
+// --- 4. 2026 AI VISION EVALUATOR ---
 app.post('/api/verify-answer', async (req, res) => {
   const { imageUrl, examStructure, subject } = req.body;
   const API_KEY = process.env.GEMINI_API_KEY;
 
   try {
-    // 1. Fetch image and convert to Base64 for Gemini Vision
+    // 1. Fetch image from Cloudinary URL and convert to Base64
     const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
     const base64Img = Buffer.from(imgResp.data, 'binary').toString('base64');
 
     const prompt = `You are a Ch.E. Professor. Evaluate this student's handwritten answer sheet for ${subject}.
     Questions & Max Marks: ${JSON.stringify(examStructure)}.
     Identify the answers for each ID (1a, 1b, etc.) and suggest marks based on correctness.
-    Return ONLY a JSON object: {"suggestedMarks": {"1a": 4, "1b": 2.5...}, "feedback": "Brief comment"}`;
+    Return ONLY a JSON object: {"suggestedMarks": {"1a": 4, "1b": 2.5}, "feedback": "Brief comment"}`;
 
     const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
       method: "POST",
@@ -54,6 +67,8 @@ app.post('/api/verify-answer', async (req, res) => {
     });
 
     const data = await aiResp.json();
+    if (!data.candidates) throw new Error("AI Refused to process image.");
+
     const rawText = data.candidates[0].content.parts[0].text;
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     
@@ -69,12 +84,14 @@ app.post('/api/verify-answer', async (req, res) => {
   }
 });
 
-// --- 2026 RESILIENT AI QUESTION GENERATOR (10s JUMPER) ---
+// --- 5. 2026 RESILIENT AI QUESTION GENERATOR ---
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
 app.post('/api/generate-sub-question', async (req, res) => {
   const { subject, syllabusContext, type, marks } = req.body;
   const prompt = `Act as Ch.E. Professor. Subject: ${subject}. Keywords: ${syllabusContext}. Type: ${type} (${marks}M). Return JSON: {"text": "...", "answer_key": "..."}`;
+  
+  // Note: Added the latest Gemini 3 Flash models from your logic
   const models = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-1.5-flash"];
 
   for (let i = 0; i < models.length; i++) {
@@ -103,13 +120,27 @@ app.post('/api/generate-sub-question', async (req, res) => {
   res.status(500).json({ success: false, error: "AI Busy." });
 });
 
-// Standard Routes
+// --- 6. STANDARD ROUTES ---
 app.get('/api/submissions', (req, res) => res.json({ success: true, data: submissions }));
+
 app.post('/api/upload-answer', upload.single('answer_image'), (req, res) => {
-  const newEntry = { id: Date.now(), studentId: req.body.studentId || "Anon", imageUrl: req.file.path, submittedAt: new Date().toLocaleTimeString(), marks: {}, totalScore: 0 };
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "No image uploaded" });
+  }
+
+  const newEntry = { 
+    id: Date.now(), 
+    studentId: req.body.studentId || "Anon", 
+    imageUrl: req.file.path, // This is now the secure Cloudinary URL
+    submittedAt: new Date().toLocaleTimeString(), 
+    marks: {}, 
+    totalScore: 0 
+  };
+  
   submissions.push(newEntry);
+  console.log("📝 New Submission Saved:", newEntry.studentId);
   res.json({ success: true, imageUrl: req.file.path });
 });
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000; // Important for Render deployment
 app.listen(PORT, () => console.log(`🚀 ENGINE ACTIVE ON PORT ${PORT}`));
