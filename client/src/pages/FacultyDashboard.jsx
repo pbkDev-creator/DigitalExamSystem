@@ -93,7 +93,7 @@ const FacultyDashboard = () => {
 
   const fetchSubmissions = async () => {
     try {
-      const res = await fetch(`http://${localIp}:5000/api/submissions`);
+      const res = await fetch(`https://digitalexamsystem.onrender.com/api/submissions`);
       const data = await res.json();
       if (data.success) {
         setSubmissions(prev => {
@@ -147,7 +147,7 @@ const FacultyDashboard = () => {
 
   const handleAI = async (qId, subId, marks, type) => {
     try {
-      const res = await fetch(`http://${localIp}:5000/api/generate-sub-question`, {
+      const res = await fetch(`https://digitalexamsystem.onrender.com/api/generate-sub-question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: selectedSubject, syllabusContext: syllabusFocus, type, marks })
