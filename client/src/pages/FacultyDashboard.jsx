@@ -71,7 +71,6 @@ const FacultyDashboard = () => {
   const [selectedSubject, setSelectedSubject] = useState(SUBJECTS[0]);
   const [syllabusFocus, setSyllabusFocus] = useState("");
   const [showQR, setShowQR] = useState(false);
-  const [localIp, setLocalIp] = useState("localhost");
   
   const [examData, setExamData] = useState([
     { id: 1, title: "Main Question 1", subQs: [{ id: '1a', text: '', marks: 5, ans: '', type: 'Numerical' }] },
@@ -81,6 +80,10 @@ const FacultyDashboard = () => {
 
   const [submissions, setSubmissions] = useState([]);
   const [selectedSub, setSelectedSub] = useState(null);
+
+  // --- CONFIG: CHANGE THIS TO YOUR ACTUAL VERCEL URL ---
+  const VERCEL_URL = "digital-exam-system-self.vercel.app"; 
+  const RENDER_URL = "https://digitalexamsystem.onrender.com";
 
   useEffect(() => {
     const session = localStorage.getItem("faculty_session");
@@ -93,7 +96,7 @@ const FacultyDashboard = () => {
 
   const fetchSubmissions = async () => {
     try {
-      const res = await fetch(`https://digitalexamsystem.onrender.com/api/submissions`);
+      const res = await fetch(`${RENDER_URL}/api/submissions`);
       const data = await res.json();
       if (data.success) {
         setSubmissions(prev => {
@@ -114,7 +117,7 @@ const FacultyDashboard = () => {
       const interval = setInterval(fetchSubmissions, 4000); 
       return () => clearInterval(interval);
     }
-  }, [auth, localIp]);
+  }, [auth]);
 
   const handleLogout = () => { localStorage.removeItem("faculty_session"); setAuth(null); };
 
@@ -127,27 +130,21 @@ const FacultyDashboard = () => {
     }
   };
 
-  // --- FIX: Record & Lock Grades Logic ---
   const handleLockGrades = () => {
     if (!selectedSub) return;
-    
-    // 1. Update the master list in state
     const updatedSubmissions = submissions.map(st => 
       st.studentId === selectedSub.studentId ? { ...selectedSub } : st
     );
     setSubmissions(updatedSubmissions);
-
-    // 2. Persist to LocalStorage for Analytics consistency
     const currentLocked = JSON.parse(localStorage.getItem('locked_submissions') || "[]");
     const updatedLocked = [...currentLocked.filter(l => l.studentId !== selectedSub.studentId), selectedSub];
     localStorage.setItem('locked_submissions', JSON.stringify(updatedLocked));
-    
     alert(`Grades for ${selectedSub.studentId} locked and synced to Analytics.`);
   };
 
   const handleAI = async (qId, subId, marks, type) => {
     try {
-      const res = await fetch(`https://digitalexamsystem.onrender.com/api/generate-sub-question`, {
+      const res = await fetch(`${RENDER_URL}/api/generate-sub-question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: selectedSubject, syllabusContext: syllabusFocus, type, marks })
@@ -327,8 +324,16 @@ const FacultyDashboard = () => {
       {showQR && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 p-10 rounded-[3rem] border border-slate-800 text-center max-w-sm w-full shadow-2xl">
-            <div className="bg-white p-4 rounded-3xl inline-block mb-6 shadow-2xl shadow-blue-500/20"><QRCodeCanvas value={`http://${localIp}:5173/submit?subject=${selectedSubject}`} size={200} /></div>
-            <div className="mb-6"><label className="text-[9px] text-blue-500 font-bold uppercase block mb-1">IP Address</label><input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-center text-xs text-white outline-none focus:border-blue-500" value={localIp} onChange={(e) => setLocalIp(e.target.value)} /></div>
+            {/* --- UPDATED: QR CODE NOW POINTS TO VERCEL URL --- */}
+            <div className="bg-white p-4 rounded-3xl inline-block mb-6 shadow-2xl shadow-blue-500/20">
+              <QRCodeCanvas value={`https://${VERCEL_URL}/submit?subject=${selectedSubject}`} size={200} />
+            </div>
+            <div className="mb-6">
+              <p className="text-[10px] text-blue-500 font-bold uppercase mb-2">Live Exam Portal</p>
+              <p className="text-white text-xs font-mono bg-slate-950 p-2 rounded-lg border border-slate-800">
+                {VERCEL_URL}/submit
+              </p>
+            </div>
             <button onClick={() => setShowQR(false)} className="w-full bg-slate-800 py-3 rounded-2xl font-bold uppercase text-[10px]">Close Portal</button>
           </div>
         </div>
