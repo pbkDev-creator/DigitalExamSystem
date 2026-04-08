@@ -2,17 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// --- 1. MASTER LICENSE DATABASE ---
-const VALID_LICENSES = [
-  {
-  "key": "TRIAL-SXAD-3Z6V",
-  "owner": "Dr. SATISH H",
-  "expiry": "2026-04-10"
-},
-  { key: "FAC-CHEM-2026-X1", owner: "Dr. Smith", expiry: "2026-12-31" },
-  { key: "FAC-POLY-2026-A2", owner: "Prof. Jones", expiry: "2026-06-01" },
-  { key: "TRIAL-99", owner: "Guest User", expiry: "2026-05-10" },
-  { key: "ADMIN-MASTER", owner: "System Administrator", expiry: "2030-01-01" }
+// --- 1. INITIAL MASTER LICENSES (Default if storage is empty) ---
+const DEFAULT_LICENSES = [
+  { key: "ADMIN-MASTER", owner: "System Administrator", expiry: "2030-01-01", isAdmin: true },
+  { key: "TRIAL-SXAD-3Z6V", owner: "Dr. SATISH H", expiry: "2026-04-10", isAdmin: false }
 ];
 
 const SUBJECTS = [
@@ -29,7 +22,9 @@ const LoginView = ({ onLoginSuccess }) => {
 
   const handleAuth = (e) => {
     e.preventDefault();
-    const license = VALID_LICENSES.find(l => l.key === inputKey);
+    const storedLicenses = JSON.parse(localStorage.getItem("system_licenses")) || DEFAULT_LICENSES;
+    const license = storedLicenses.find(l => l.key === inputKey);
+    
     if (!license) {
       setError("Invalid License Key. Access Denied.");
     } else {
@@ -72,6 +67,10 @@ const FacultyDashboard = () => {
   const [syllabusFocus, setSyllabusFocus] = useState("");
   const [showQR, setShowQR] = useState(false);
   
+  // Admin & License Management State
+  const [allLicenses, setAllLicenses] = useState([]);
+  const [newFac, setNewFac] = useState({ key: '', owner: '', expiry: '' });
+
   const [examData, setExamData] = useState([
     { id: 1, title: "Main Question 1", subQs: [{ id: '1a', text: '', marks: 5, ans: '', type: 'Numerical' }] },
     { id: 2, title: "Main Question 2", subQs: [{ id: '2a', text: '', marks: 5, ans: '', type: 'Theory' }] },
@@ -81,11 +80,20 @@ const FacultyDashboard = () => {
   const [submissions, setSubmissions] = useState([]);
   const [selectedSub, setSelectedSub] = useState(null);
 
-  // --- CONFIG: CHANGE THIS TO YOUR ACTUAL VERCEL URL ---
+  // --- CONFIG: PRODUCTION URLS ---
   const VERCEL_URL = "digital-exam-system-self.vercel.app"; 
   const RENDER_URL = "https://digitalexamsystem.onrender.com";
 
   useEffect(() => {
+    // Sync dynamic licenses
+    const stored = localStorage.getItem("system_licenses");
+    if (!stored) {
+      localStorage.setItem("system_licenses", JSON.stringify(DEFAULT_LICENSES));
+      setAllLicenses(DEFAULT_LICENSES);
+    } else {
+      setAllLicenses(JSON.parse(stored));
+    }
+
     const session = localStorage.getItem("faculty_session");
     if (session) {
       const parsed = JSON.parse(session);
@@ -132,14 +140,12 @@ const FacultyDashboard = () => {
 
   const handleLockGrades = () => {
     if (!selectedSub) return;
-    const updatedSubmissions = submissions.map(st => 
-      st.studentId === selectedSub.studentId ? { ...selectedSub } : st
-    );
+    const updatedSubmissions = submissions.map(st => st.studentId === selectedSub.studentId ? { ...selectedSub } : st);
     setSubmissions(updatedSubmissions);
     const currentLocked = JSON.parse(localStorage.getItem('locked_submissions') || "[]");
     const updatedLocked = [...currentLocked.filter(l => l.studentId !== selectedSub.studentId), selectedSub];
     localStorage.setItem('locked_submissions', JSON.stringify(updatedLocked));
-    alert(`Grades for ${selectedSub.studentId} locked and synced to Analytics.`);
+    alert(`Grades for ${selectedSub.studentId} locked.`);
   };
 
   const handleAI = async (qId, subId, marks, type) => {
@@ -173,6 +179,22 @@ const FacultyDashboard = () => {
     const a = document.createElement('a'); a.href = url; a.download = "Grading_Report.csv"; a.click();
   };
 
+  // --- ADMIN FUNCTIONS ---
+  const addLicense = () => {
+    if (!newFac.key || !newFac.owner || !newFac.expiry) return alert("Fill all fields");
+    const updated = [...allLicenses, { ...newFac, isAdmin: false }];
+    setAllLicenses(updated);
+    localStorage.setItem("system_licenses", JSON.stringify(updated));
+    setNewFac({ key: '', owner: '', expiry: '' });
+  };
+
+  const deleteLicense = (key) => {
+    if (key === "ADMIN-MASTER") return alert("Cannot delete Master Admin");
+    const updated = allLicenses.filter(l => l.key !== key);
+    setAllLicenses(updated);
+    localStorage.setItem("system_licenses", JSON.stringify(updated));
+  };
+
   if (!auth) return <LoginView onLoginSuccess={setAuth} />;
 
   return (
@@ -195,6 +217,11 @@ const FacultyDashboard = () => {
           <button onClick={() => setView('design')} className={`px-6 py-2 rounded-full font-bold text-xs uppercase ${view === 'design' ? 'bg-blue-600' : 'bg-slate-900'}`}>Design</button>
           <button onClick={() => setView('evaluate')} className={`px-6 py-2 rounded-full font-bold text-xs uppercase ${view === 'evaluate' ? 'bg-blue-600' : 'bg-slate-900'}`}>Evaluate</button>
           <button onClick={() => setView('analytics')} className={`px-6 py-2 rounded-full font-bold text-xs uppercase ${view === 'analytics' ? 'bg-indigo-600' : 'bg-slate-900'}`}>Analytics</button>
+          
+          {auth.isAdmin && (
+            <button onClick={() => setView('admin')} className={`px-6 py-2 rounded-full font-bold text-xs uppercase ${view === 'admin' ? 'bg-red-600' : 'bg-slate-900 text-red-400'}`}>Admin Panel</button>
+          )}
+
           <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
           <button onClick={handleLogout} className="px-4 py-2 rounded-full font-bold text-[9px] uppercase bg-slate-900 text-red-500 border border-red-900/30 hover:bg-red-600 hover:text-white transition-all">Logout</button>
         </div>
@@ -203,6 +230,32 @@ const FacultyDashboard = () => {
             <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Faculty: {auth.owner}</p>
         </div>
       </nav>
+
+      {/* ADMIN VIEW */}
+      {view === 'admin' && (
+        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in">
+          <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-2xl">
+            <h2 className="text-2xl font-black mb-6">🛡️ License Management</h2>
+            <div className="grid grid-cols-4 gap-4 mb-8 bg-slate-950 p-6 rounded-2xl border border-slate-800">
+              <input type="text" placeholder="License Key" className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs text-white" value={newFac.key} onChange={e => setNewFac({...newFac, key: e.target.value})} />
+              <input type="text" placeholder="Faculty Name" className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs text-white" value={newFac.owner} onChange={e => setNewFac({...newFac, owner: e.target.value})} />
+              <input type="date" className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs text-white" value={newFac.expiry} onChange={e => setNewFac({...newFac, expiry: e.target.value})} />
+              <button onClick={addLicense} className="bg-blue-600 rounded-xl font-black text-[10px] uppercase">Add Faculty</button>
+            </div>
+            <div className="space-y-3">
+              {allLicenses.map(l => (
+                <div key={l.key} className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div>
+                    <p className="font-bold text-white text-sm">{l.owner} <span className="text-[10px] text-slate-500">({l.key})</span></p>
+                    <p className="text-[10px] text-blue-500 uppercase font-bold">Expires: {l.expiry}</p>
+                  </div>
+                  <button onClick={() => deleteLicense(l.key)} className="text-red-500 bg-red-500/10 px-4 py-2 rounded-lg text-[10px] font-black uppercase">Delete</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DESIGN VIEW */}
       {view === 'design' && (
@@ -244,9 +297,8 @@ const FacultyDashboard = () => {
                         <option>Numerical</option><option>Theory</option><option>Derivation</option><option>Short Definition</option>
                       </select>
                       <input type="number" className="w-14 bg-slate-900 border border-slate-700 p-2 rounded text-center text-blue-400 font-bold" value={sub.marks} onChange={(e) => setExamData(prev => prev.map(q => q.id === mainQ.id ? {...q, subQs: q.subQs.map(s => s.id === sub.id ? {...s, marks: parseInt(e.target.value)} : s)} : q))} />
-                      <button onClick={() => setExamData(prev => prev.map(q => q.id === mainQ.id ? {...q, subQs: q.subQs.filter(s => s.id !== sub.id)} : q))} className="text-red-500 text-sm">🗑️</button>
                     </div>
-                    <button onClick={() => handleAI(mainQ.id, sub.id, sub.marks, sub.type)} className="w-full bg-blue-600 text-[10px] py-2 rounded font-black uppercase tracking-widest shadow-lg">✨ AI Generate</button>
+                    <button onClick={() => handleAI(mainQ.id, sub.id, sub.marks, sub.type)} className="w-full bg-blue-600 text-[10px] py-2 rounded font-black uppercase shadow-lg">✨ AI Generate</button>
                   </div>
                   <div className="marks-print">[{sub.marks} M]</div>
                 </div>
@@ -270,7 +322,7 @@ const FacultyDashboard = () => {
                 <button onClick={() => deleteStudent(s.studentId)} className="bg-red-950/20 text-red-500 px-3 rounded-xl border border-red-900/30 hover:bg-red-600 hover:text-white transition opacity-0 group-hover:opacity-100">🗑️</button>
               </div>
             ))}
-            <button onClick={downloadCSV} className="w-full mt-4 bg-emerald-600 text-[10px] font-bold py-4 rounded-xl uppercase hover:bg-emerald-500 transition shadow-lg">📥 Download CSV Report</button>
+            <button onClick={downloadCSV} className="w-full mt-4 bg-emerald-600 text-[10px] font-bold py-4 rounded-xl uppercase shadow-lg">📥 Download CSV Report</button>
           </div>
           <div className="col-span-9 bg-slate-900 rounded-3xl p-6 border border-slate-800 overflow-hidden">
             {selectedSub ? (
@@ -290,7 +342,7 @@ const FacultyDashboard = () => {
                       <div className="bg-black/30 p-2 rounded border border-slate-800 text-[10px] text-slate-400 italic">Key: {sub.ans || "N/A"}</div>
                     </div>
                   )))}
-                  <button onClick={handleLockGrades} className="w-full bg-blue-600 py-4 rounded-xl font-black uppercase text-xs shadow-xl hover:bg-blue-500 transition-all active:scale-95">🔒 Record & Lock Grades</button>
+                  <button onClick={handleLockGrades} className="w-full bg-blue-600 py-4 rounded-xl font-black uppercase text-xs shadow-xl">🔒 Record & Lock Grades</button>
                 </div>
               </div>
             ) : <div className="flex h-full items-center justify-center text-slate-700 italic">Select a Roll Number</div>}
@@ -306,17 +358,16 @@ const FacultyDashboard = () => {
              <button onClick={() => window.print()} className="bg-indigo-600 px-6 py-2 rounded-lg font-bold text-xs uppercase">Download PDF Report</button>
           </div>
           <div className="grid grid-cols-3 gap-6">
-            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center"><p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Submissions</p><p className="text-4xl font-black text-white">{submissions.length}</p></div>
-            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center"><p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Average</p><p className="text-4xl font-black text-blue-500">{(submissions.reduce((a,b)=>a+(Number(b.totalScore)||0),0)/(submissions.length||1)).toFixed(1)}</p></div>
-            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center"><p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Pass Rate</p><p className="text-4xl font-black text-emerald-500">{submissions.length ? ((submissions.filter(s=>Number(s.totalScore)>=16).length/submissions.length)*100).toFixed(0) : 0}%</p></div>
+            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center"><p className="text-4xl font-black text-white">{submissions.length}</p><p className="text-[10px] uppercase font-bold text-slate-500">Submissions</p></div>
+            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center"><p className="text-4xl font-black text-blue-500">{(submissions.reduce((a,b)=>a+(Number(b.totalScore)||0),0)/(submissions.length||1)).toFixed(1)}</p><p className="text-[10px] uppercase font-bold text-slate-500">Average</p></div>
+            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center"><p className="text-4xl font-black text-emerald-500">{submissions.length ? ((submissions.filter(s=>Number(s.totalScore)>=16).length/submissions.length)*100).toFixed(0) : 0}%</p><p className="text-[10px] uppercase font-bold text-slate-500">Pass Rate</p></div>
           </div>
-          <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800" style={{ minHeight: '400px' }}>
-             <ResponsiveContainer width="100%" height={400} key={view}>
+          <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800">
+             <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={submissions.filter(s => (Number(s.totalScore) || 0) > 0)}>
                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} /><XAxis dataKey="studentId" stroke="#64748b" fontSize={10} /><YAxis stroke="#64748b" /><Tooltip cursor={{fill: '#1e293b'}} contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '10px'}} /><Bar dataKey="totalScore" fill="#3b82f6" radius={[5, 5, 0, 0]} barSize={40} /></BarChart>
              </ResponsiveContainer>
           </div>
-          <div className="flex justify-center pt-6"><button onClick={() => {localStorage.clear(); window.location.reload();}} className="bg-red-950/30 text-red-500 border border-red-900/50 px-8 py-3 rounded-full font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all">⚠️ Clear Data & Reset</button></div>
         </div>
       )}
 
@@ -324,15 +375,8 @@ const FacultyDashboard = () => {
       {showQR && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 p-10 rounded-[3rem] border border-slate-800 text-center max-w-sm w-full shadow-2xl">
-            {/* --- UPDATED: QR CODE NOW POINTS TO VERCEL URL --- */}
-            <div className="bg-white p-4 rounded-3xl inline-block mb-6 shadow-2xl shadow-blue-500/20">
+            <div className="bg-white p-4 rounded-3xl inline-block mb-6">
               <QRCodeCanvas value={`https://${VERCEL_URL}/submit?subject=${selectedSubject}`} size={200} />
-            </div>
-            <div className="mb-6">
-              <p className="text-[10px] text-blue-500 font-bold uppercase mb-2">Live Exam Portal</p>
-              <p className="text-white text-xs font-mono bg-slate-950 p-2 rounded-lg border border-slate-800">
-                {VERCEL_URL}/submit
-              </p>
             </div>
             <button onClick={() => setShowQR(false)} className="w-full bg-slate-800 py-3 rounded-2xl font-bold uppercase text-[10px]">Close Portal</button>
           </div>
