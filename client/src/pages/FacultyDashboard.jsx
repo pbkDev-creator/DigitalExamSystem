@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 // --- 1. INITIAL MASTER LICENSES (Default if storage is empty) ---
 const DEFAULT_LICENSES = [
   { key: "ADMIN-MASTER", owner: "System Administrator", expiry: "2030-01-01", isAdmin: true },
+  { key: " TRIAL-AMTX-XT74", owner: "MURGESH-H", expiry: "2026-05-15", isAdmin: false },
   { key: "TRIAL-SXAD-3Z6V", owner: "Dr. SATISH H", expiry: "2026-04-10", isAdmin: false }
 ];
 
