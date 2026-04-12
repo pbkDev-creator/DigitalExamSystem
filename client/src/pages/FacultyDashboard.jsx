@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// --- 1. INITIAL MASTER LICENSES (Default if storage is empty) ---
+// --- 1. MASTER LICENSES (Hard-coded for all devices) ---
 const DEFAULT_LICENSES = [
   { key: "ADMIN-MASTER", owner: "System Administrator", expiry: "2030-01-01", isAdmin: true },
-  { key: " TRIAL-AMTX-XT74", owner: "MURGESH-H", expiry: "2026-05-15", isAdmin: false },
-  { key: "TRIAL-SXAD-3Z6V", owner: "Dr. SATISH H", expiry: "2026-04-10", isAdmin: false }
+  { key: "TRIAL-SXAD-3Z6V", owner: "Dr. SATISH H", expiry: "2026-04-10", isAdmin: false },
+  { key: " TRIAL-AMTX-XT74", owner: "MURGESH-H", expiry: "2026-05-15", isAdmin: false }
+  // Paste your new code blocks from AdminTool.html below:
+  
 ];
 
 const SUBJECTS = [
@@ -68,7 +70,6 @@ const FacultyDashboard = () => {
   const [syllabusFocus, setSyllabusFocus] = useState("");
   const [showQR, setShowQR] = useState(false);
   
-  // Admin & License Management State
   const [allLicenses, setAllLicenses] = useState([]);
   const [newFac, setNewFac] = useState({ key: '', owner: '', expiry: '' });
 
@@ -86,14 +87,18 @@ const FacultyDashboard = () => {
   const RENDER_URL = "https://digitalexamsystem.onrender.com";
 
   useEffect(() => {
-    // Sync dynamic licenses
-    const stored = localStorage.getItem("system_licenses");
-    if (!stored) {
-      localStorage.setItem("system_licenses", JSON.stringify(DEFAULT_LICENSES));
-      setAllLicenses(DEFAULT_LICENSES);
-    } else {
-      setAllLicenses(JSON.parse(stored));
-    }
+    // FORCE SYNC: Merges Hard-coded keys with LocalStorage keys
+    const stored = JSON.parse(localStorage.getItem("system_licenses") || "[]");
+    const merged = [...DEFAULT_LICENSES];
+    
+    stored.forEach(s => {
+      if (!merged.find(m => m.key === s.key)) {
+        merged.push(s);
+      }
+    });
+
+    localStorage.setItem("system_licenses", JSON.stringify(merged));
+    setAllLicenses(merged);
 
     const session = localStorage.getItem("faculty_session");
     if (session) {
@@ -180,7 +185,6 @@ const FacultyDashboard = () => {
     const a = document.createElement('a'); a.href = url; a.download = "Grading_Report.csv"; a.click();
   };
 
-  // --- ADMIN FUNCTIONS ---
   const addLicense = () => {
     if (!newFac.key || !newFac.owner || !newFac.expiry) return alert("Fill all fields");
     const updated = [...allLicenses, { ...newFac, isAdmin: false }];
@@ -220,11 +224,11 @@ const FacultyDashboard = () => {
           <button onClick={() => setView('analytics')} className={`px-6 py-2 rounded-full font-bold text-xs uppercase ${view === 'analytics' ? 'bg-indigo-600' : 'bg-slate-900'}`}>Analytics</button>
           
           {auth.isAdmin && (
-            <button onClick={() => setView('admin')} className={`px-6 py-2 rounded-full font-bold text-xs uppercase ${view === 'admin' ? 'bg-red-600' : 'bg-slate-900 text-red-400'}`}>Admin Panel</button>
+            <button onClick={() => setView('admin')} className={`px-6 py-2 rounded-full font-bold text-xs uppercase ${view === 'admin' ? 'bg-red-600 shadow-lg shadow-red-900/20' : 'bg-slate-900 text-red-400'}`}>Admin Panel</button>
           )}
 
           <div className="h-6 w-[1px] bg-slate-800 mx-2"></div>
-          <button onClick={handleLogout} className="px-4 py-2 rounded-full font-bold text-[9px] uppercase bg-slate-900 text-red-500 border border-red-900/30 hover:bg-red-600 hover:text-white transition-all">Logout</button>
+          <button onClick={handleLogout} className="px-4 py-2 rounded-full font-bold text-[9px] uppercase bg-slate-900 text-red-500 border border-red-900/30">Logout</button>
         </div>
         <div className="text-right">
             <h1 className="text-xl font-black italic text-blue-500 tracking-tighter">CH.E. SECURE_EXAM</h1>
@@ -236,7 +240,7 @@ const FacultyDashboard = () => {
       {view === 'admin' && (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in">
           <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-2xl">
-            <h2 className="text-2xl font-black mb-6">🛡️ License Management</h2>
+            <h2 className="text-2xl font-black mb-6 flex items-center gap-3">🛡️ License Management</h2>
             <div className="grid grid-cols-4 gap-4 mb-8 bg-slate-950 p-6 rounded-2xl border border-slate-800">
               <input type="text" placeholder="License Key" className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs text-white" value={newFac.key} onChange={e => setNewFac({...newFac, key: e.target.value})} />
               <input type="text" placeholder="Faculty Name" className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs text-white" value={newFac.owner} onChange={e => setNewFac({...newFac, owner: e.target.value})} />
@@ -369,6 +373,7 @@ const FacultyDashboard = () => {
                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} /><XAxis dataKey="studentId" stroke="#64748b" fontSize={10} /><YAxis stroke="#64748b" /><Tooltip cursor={{fill: '#1e293b'}} contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '10px'}} /><Bar dataKey="totalScore" fill="#3b82f6" radius={[5, 5, 0, 0]} barSize={40} /></BarChart>
              </ResponsiveContainer>
           </div>
+          <div className="flex justify-center pt-6"><button onClick={() => {localStorage.clear(); window.location.reload();}} className="bg-red-950/30 text-red-500 border border-red-900/50 px-8 py-3 rounded-full font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all">⚠️ Clear Data & Reset</button></div>
         </div>
       )}
 
