@@ -4,10 +4,10 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 
 // --- 1. MASTER LICENSES (Hard-coded for all devices) ---
 const DEFAULT_LICENSES = [
-  { key: "ADMIN-MASTER", owner: "System Administrator", expiry: "2030-01-01", isAdmin: true },
-  { key: "ADMIN-MASTER-PBK", owner: "System Administrator", expiry: "2026-06-01", isAdmin: true },
-  { key: "TRIAL-SXAD-3Z6V", owner: "Dr. SATISH H", expiry: "2026-04-10", isAdmin: false },
-  { key: " TRIAL-AMTX-XT74", owner: "MURGESH-H", expiry: "2026-05-15", isAdmin: false }
+  { key: "ADMIN-MASTER", owner: "System Administrator", expiry: "2026-05-15", isAdmin: true },
+  { key: "ADMIN-MASTER-PBK", owner: "System Administrator", expiry: "2030-01-01", isAdmin: true },
+  { key: "TRIAL-SXAD-3Z6V", owner: "Dr. SATISH H", expiry: "2026-06-10", isAdmin: true },
+  { key: " TRIAL-AMTX-XT74", owner: "MURGESH-H", expiry: "2026-08-15", isAdmin: true }
   // Paste your new code blocks from AdminTool.html below:
   
 ];
