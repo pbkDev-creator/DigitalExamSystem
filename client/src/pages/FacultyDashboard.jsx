@@ -7,8 +7,13 @@ const DEFAULT_LICENSES = [
   { key: "ADMIN-MASTER", owner: "System Administrator", expiry: "2026-05-15", isAdmin: true },
   { key: "ADMIN-MASTER-PBK", owner: "System Administrator", expiry: "2030-01-01", isAdmin: true },
   { key: "TRIAL-SXAD-3Z6V", owner: "Dr. SATISH H", expiry: "2026-06-10", isAdmin: true },
-  { key: " TRIAL-AMTX-XT74", owner: "MURGESH-H", expiry: "2026-08-15", isAdmin: true }
+  
   // Paste your new code blocks from AdminTool.html below:
+  {
+  "key": "TRIAL-R9M8-MXBB",
+  "owner": "DR.MEGERI",
+  "expiry": "2026-05-15"
+},
   
 ];
 
